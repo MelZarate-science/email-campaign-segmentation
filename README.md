@@ -6,7 +6,7 @@ El análisis permite identificar grupos de usuarios con comportamientos similare
 ## Contenido
 - Exploración del dataset
 - Preprocesamiento de variables
-- Modelado con algoritmos de clustering (K-Means, etc.)
+- Modelado con algoritmos de clustering (K-Means)
 - Visualización de clusters
 - Interpretación de resultados y oportunidades de negocio
 
