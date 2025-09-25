@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Clientes por Clustering - Resultados Mejorados</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            background-color: #f9fafb;
+        }
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            transition: all 0.8s ease-in-out;
+            padding: 2rem;
+            box-sizing: border-box;
+            overflow-y: auto;
+            transform: translateX(20px);
+        }
+        .slide.active {
+            opacity: 1;
+            z-index: 10;
+            transform: translateX(0);
+        }
+        .nav-btn {
+            position: fixed;
+            z-index: 100;
+            background: rgba(79, 70, 229, 0.7);
+            backdrop-filter: blur(10px);
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        #prev-btn, #next-btn {
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        #prev-btn {
+            left: 20px;
+        }
+        #next-btn {
+            right: 20px;
+        }
+        .nav-btn:hover {
+            background: rgba(79, 70, 229, 0.9);
+            transform: translateY(-50%) scale(1.1);
+        }
+        .progress-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            max-width: 90vw;
+            justify-content: center;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            padding: 8px 16px;
+            border-radius: 50px;
+        }
+        .progress-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(79, 70, 229, 0.4);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .progress-dot.active {
+            background: #4F46E5;
+            transform: scale(1.2);
+        }
+        .cluster-card {
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #f3f4f6;
+            height: 100%;
+        }
+        .cluster-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+        }
+        .section-title {
+            position: relative;
+            padding-bottom: 1rem;
+        }
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 4px;
+            background: linear-gradient(90deg, #4F46E5, #7C3AED);
+            border-radius: 2px;
+        }
+        .slide-content {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .insight-box {
+            background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+            border-left: 4px solid #4F46E5;
+        }
+        .footer-note {
+            position: fixed;
+            bottom: 10px;
+            right: 20px;
+            z-index: 200;
+            color: #9ca3af;
+            font-size: 0.8rem;
+        }
+        .metric-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .metric-good {
+            background-color: #D1FAE5;
+            color: #065F46;
+        }
+        .metric-warning {
+            background-color: #FEF3C7;
+            color: #92400E;
+        }
+        .metric-bad {
+            background-color: #FEE2E2;
+            color: #B91C1C;
+        }
+        @media (max-width: 768px) {
+            .nav-btn {
+                width: 40px;
+                height: 40px;
+            }
+            .progress-bar {
+                padding: 6px 12px;
+            }
+        }
+        .timeline-visual {
+            height: 24px;
+            background: #e5e7eb;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+        .time-window {
+            position: absolute;
+            height: 100%;
+            background: linear-gradient(90deg, #4F46E5, #7C3AED);
+            border-radius: 12px;
+        }
+        .time-marker {
+            position: absolute;
+            width: 2px;
+            height: 32px;
+            top: -4px;
+            background: #1f2937;
+        }
+        .time-label {
+            position: absolute;
+            font-size: 0.75rem;
+            transform: translateX(-50%);
+            top: -24px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 relative">
+    <button id="prev-btn" class="nav-btn shadow-lg">
+        <i class="fas fa-chevron-left text-white text-xl"></i>
+    </button>
+    <button id="next-btn" class="nav-btn shadow-lg">
+        <i class="fas fa-chevron-right text-white text-xl"></i>
+    </button>
+
+    <div class="progress-bar" id="progress-bar"></div>
+
+    <div class="footer-note">
+        Análisis de Clustering
+    </div>
+
+    <section class="slide active flex items-center justify-center" style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);">
+        <div class="text-center slide-content px-4">
+            <div class="mb-8">
+                <div class="inline-block p-5 rounded-2xl bg-white/10 backdrop-blur-sm mb-8">
+                    <i class="fas fa-chart-pie text-white text-5xl"></i>
+                </div>
+                <h1 class="text-4xl md:text-6xl font-bold text-white mb-4 leading-tight">Análisis de Clustering</h1>
+                <p class="text-xl md:text-2xl text-indigo-100 mb-6">Segmentación inteligente</p>
+                <div class="w-24 h-1 bg-indigo-300 mx-auto mb-6"></div>
+                <p class="text-indigo-200 text-lg">5 Clústeres con Ventanas Horarias de Engagement</p>
+            </div>
+            <div class="mt-16">
+                <button class="next-slide-btn bg-white text-indigo-600 px-6 py-3 rounded-full font-medium shadow-lg hover:bg-indigo-50 transition">
+                    Comenzar <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Slide 1: Contexto + Variables Clave -->
+<section class="slide bg-white">
+  <div class="slide-content py-12 px-6">
+    <h2 class="text-3xl md:text-4xl font-bold text-center mb-6 text-gray-800 section-title">
+      Contexto y Variables Clave
+    </h2>
+    
+    <p class="text-center text-gray-600 max-w-2xl mx-auto mb-12">
+      Este análisis parte de una <span class="font-bold">base de datos de 212.292 usuarios</span>
+      vinculados a una campaña de email marketing. El objetivo es segmentar la base para identificar
+      patrones de comportamiento y diseñar estrategias de comunicación más efectivas.
+    </p>
+
+    <!-- Tabla de variables -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm border border-gray-200 rounded-lg">
+        <thead class="bg-gray-100 text-gray-700">
+          <tr>
+            <th class="p-3 text-left">Variable</th>
+            <th class="p-3 text-left">Descripción</th>
+            <th class="p-3 text-left">Naturaleza</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <tr>
+            <td class="p-3 font-medium">id</td>
+            <td class="p-3">Identificador único de cada usuario</td>
+            <td class="p-3">Categórica nominal</td>
+          </tr>
+          <tr>
+            <td class="p-3 font-medium">send</td>
+            <td class="p-3">Cantidad de correos enviados</td>
+            <td class="p-3">Numérica (conteo)</td>
+          </tr>
+          <tr>
+            <td class="p-3 font-medium">bounce</td>
+            <td class="p-3">Cantidad de correos rebotados</td>
+            <td class="p-3">Numérica (conteo)</td>
+          </tr>
+          <tr>
+            <td class="p-3 font-medium">open</td>
+            <td class="p-3">Número de aperturas de correo</td>
+            <td class="p-3">Numérica (conteo)</td>
+          </tr>
+          <tr>
+            <td class="p-3 font-medium">click</td>
+            <td class="p-3">Número de clics en enlaces</td>
+            <td class="p-3">Numérica (conteo)</td>
+          </tr>
+          <tr>
+            <td class="p-3 font-medium">buyer</td>
+            <td class="p-3">Indica si realizó una compra</td>
+            <td class="p-3">Binaria (0/1)</td>
+          </tr>
+          <tr>
+            <td class="p-3 font-medium">hour</td>
+            <td class="p-3">Hora más representativa de interacción</td>
+            <td class="p-3">Numérica (0–23)</td>
+          </tr>
+          <tr>
+            <td class="p-3 font-medium">day_of_week</td>
+            <td class="p-3">Día más representativo de interacción</td>
+            <td class="p-3">Numérica (0=Lunes, 6=Domingo)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Nota metodológica -->
+    <div class="mt-6 bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm text-gray-700">
+      <span class="mr-2">📌</span>
+      Nota metodológica: la variable <code>hour</code> y <code>day_of_week</code> representan 
+      la hora y el día más típicos de interacción de cada usuario, no un promedio aritmético exacto.
+    </div>
+  </div>
+</section>
+
+<!--Slide 2: Limpieza y Preprocesamiento -->
+<section class="slide bg-white">
+  <div class="slide-content py-12 px-6">
+    <h2 class="text-3xl md:text-4xl font-bold text-center mb-6 text-gray-800 section-title">
+      Limpieza y Preprocesamiento de Datos
+    </h2>
+    <p class="text-center text-gray-600 max-w-2xl mx-auto mb-12 text-base leading-relaxed">
+      Análisis exhaustivo de calidad de datos y estrategias de transformación para clustering.
+    </p>
+
+    <!-- Grilla 2x2 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+
+      <!-- Columna de Limpieza -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-red-500 cluster-card">
+        <h3 class="text-xl font-bold text-red-800 mb-4">
+          <i class="fas fa-broom text-red-600 mr-2"></i> Limpieza de Datos
+        </h3>
+        
+        <div class="mb-4">
+          <div class="flex items-start mb-2">
+            <span class="metric-badge metric-warning mr-2">7.2%</span>
+            <span class="text-sm">de registros con inconsistencias en <code>total</code></span>
+          </div>
+          <div class="flex items-start mb-4">
+            <span class="metric-badge metric-bad mr-2">17</span>
+            <span class="text-sm">registros con inconsistencias graves <strong>eliminados</strong></span>
+          </div>
+          
+          <div class="text-sm font-medium text-gray-700 mb-2">Inconsistencias detectadas:</div>
+          <div class="bg-gray-50 rounded-lg p-4 text-xs">
+            <div class="flex justify-between py-1 border-b border-gray-100">
+              <span>send = bounce + interacción</span>
+              <span class="font-bold text-red-600">6 registros</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-gray-100">
+              <span>bounce > send</span>
+              <span class="font-bold text-red-600">11 registros</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-gray-100">
+              <span>send = 0 y interacción > 0</span>
+              <span class="font-bold">0 registros</span>
+            </div>
+            <div class="flex justify-between py-1">
+              <span>valores negativos</span>
+              <span class="font-bold">0 registros</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="text-xs text-gray-600 bg-red-50 p-3 rounded-lg border border-red-100 leading-relaxed">
+          <i class="fas fa-info-circle text-red-500 mr-1"></i> 
+          Se eliminó la columna <code>total</code> por inconsistente e innecesaria,
+          y se removieron las 17 filas con inconsistencias graves para garantizar la integridad de los datos.
+        </div>
+      </div>
+
+      <!-- Lógica de Transformaciones -->
+<div class="bg-yellow-50 rounded-xl p-6 border border-yellow-200 mb-8">
+  <h3 class="text-xl font-bold text-yellow-800 mb-4 flex items-center">
+    <i class="fas fa-check-circle text-yellow-600 mr-2"></i> Lógica de las Transformaciones Aplicadas
+  </h3>
+  <div class="text-sm text-gray-700 space-y-4 leading-relaxed">
+   <p>
+  <strong>Transformaciones logarítmicas (send, delivered):</strong> 
+  Apliqué esta transformación solo a estas dos variables porque, aunque tenían un sesgo positivo marcado (muchos valores pequeños y algunos muy grandes), no estaban dominadas por ceros. 
+  De esta forma, el log reduce la influencia de valores extremos y genera distribuciones más balanceadas para el clustering. 
+  En variables con muchísimos ceros (ej. <code>open</code>, <code>click</code>), el log no aporta mejoras, ya que la concentración de ceros persiste; 
+  en esos casos preferí utilizar únicamente escalado robusto.
+</p>
+    <p>
+      <strong>Transformaciones trigonométricas (hour, day_of_week):</strong> 
+      Estas variables de tiempo no podían ser interpretadas correctamente por el algoritmo en su forma original, 
+      ya que después de las 23h sigue la 0h, y eso no es lineal. 
+      Por eso las transformé en <code>sin_day</code>, <code>cos_day</code>, <code>sin_hour</code> y <code>cos_hour</code>, 
+      de modo que el modelo pudiera capturar su naturaleza cíclica.
+    </p>
+    <p>
+      <strong>Escalado con RobustScaler:</strong> 
+      Como la mayoría de las variables tenían gran cantidad de outliers, opté por este método de normalización, 
+      que es menos sensible a valores extremos. 
+      Además, es indispensable que todas las variables queden en una misma escala para que el algoritmo de clustering 
+      pueda calcular distancias y formar los grupos de manera coherente.
+    </p>
+  </div>
+</div>
+
+      <!-- Análisis de Distribuciones -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-blue-500 cluster-card">
+        <h3 class="text-xl font-bold text-blue-800 mb-4">
+          <i class="fas fa-chart-bar text-blue-600 mr-2"></i> Análisis de Distribuciones
+        </h3>
+        
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead class="bg-gray-100 text-gray-700">
+              <tr>
+                <th class="p-2 text-left">Variable</th>
+                <th class="p-2 text-center">Sesgo</th>
+                <th class="p-2 text-center">% Ceros</th>
+                <th class="p-2 text-center">% Outliers</th>
+                <th class="p-2 text-center">Evaluación</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+        <tr>
+          <td class="p-2">send</td>
+          <td class="p-2 text-center">3.37</td>
+          <td class="p-2 text-center">0.00%</td>
+          <td class="p-2 text-center">3.99%</td>
+          <td class="p-2 text-center"><span class="metric-badge metric-warning">Alto sesgo</span></td>
+        </tr>
+        <tr>
+          <td class="p-2">bounce</td>
+          <td class="p-2 text-center">8.40</td>
+          <td class="p-2 text-center">80.08%</td>
+          <td class="p-2 text-center">19.92%</td>
+          <td class="p-2 text-center"><span class="metric-badge metric-bad">Muchos ceros y outliers</span></td>
+        </tr>
+        <tr>
+          <td class="p-2">open</td>
+          <td class="p-2 text-center">16.92</td>
+          <td class="p-2 text-center">78.45%</td>
+          <td class="p-2 text-center">21.55%</td>
+          <td class="p-2 text-center"><span class="metric-badge metric-bad">Muchos ceros y outliers</span></td>
+        </tr>
+        <tr>
+          <td class="p-2">click</td>
+          <td class="p-2 text-center">67.36</td>
+          <td class="p-2 text-center">96.29%</td>
+          <td class="p-2 text-center">3.71%</td>
+          <td class="p-2 text-center"><span class="metric-badge metric-bad">Sesgo extremo y ceros</span></td>
+        </tr>
+        <tr>
+          <td class="p-2">buyer</td>
+          <td class="p-2 text-center">-0.48</td>
+          <td class="p-2 text-center">38.34%</td>
+          <td class="p-2 text-center">0.00%</td>
+          <td class="p-2 text-center"><span class="metric-badge metric-good">Binaria</span></td>
+        </tr>
+        <tr>
+          <td class="p-2">delivered</td>
+          <td class="p-2 text-center">2.83</td>
+          <td class="p-2 text-center">18.51%</td>
+          <td class="p-2 text-center">3.93%</td>
+          <td class="p-2 text-center"><span class="metric-badge metric-warning">Sesgo moderado</span></td>
+        </tr>
+        <tr>
+          <td class="p-2">open_rate</td>
+          <td class="p-2 text-center">-0.19</td>
+          <td class="p-2 text-center">23.65%</td>
+          <td class="p-2 text-center">0.00%</td>
+          <td class="p-2 text-center"><span class="metric-badge metric-good">Aceptable</span></td>
+        </tr>
+        <tr>
+          <td class="p-2">click_rate</td>
+          <td class="p-2 text-center">-2.28</td>
+          <td class="p-2 text-center">79.31%</td>
+          <td class="p-2 text-center">20.69%</td>
+          <td class="p-2 text-center"><span class="metric-badge metric-bad">Muchos ceros y outliers</span></td>
+        </tr>
+        <tr>
+          <td class="p-2">sin_day</td>
+          <td class="p-2 text-center">-1.06</td>
+          <td class="p-2 text-center">3.96%</td>
+          <td class="p-2 text-center">20.06%</td>
+          <td class="p-2 text-center"><span class="metric-badge metric-warning">Trigonométrica</span></td>
+        </tr>
+        <tr>
+          <td class="p-2">cos_day</td>
+          <td class="p-2 text-center">0.10</td>
+          <td class="p-2 text-center">0.00%</td>
+          <td class="p-2 text-center">0.00%</td>
+          <td class="p-2 text-center"><span class="metric-badge metric-good">Trigonométrica</span></td>
+        </tr>
+        <tr>
+          <td class="p-2">sin_hour</td>
+          <td class="p-2 text-center">2.23</td>
+          <td class="p-2 text-center">0.09%</td>
+          <td class="p-2 text-center">14.67%</td>
+          <td class="p-2 text-center"><span class="metric-badge metric-warning">Trigonométrica</span></td>
+        </tr>
+        <tr>
+          <td class="p-2">cos_hour</td>
+          <td class="p-2 text-center">-0.64</td>
+          <td class="p-2 text-center">0.00%</td>
+          <td class="p-2 text-center">0.00%</td>
+          <td class="p-2 text-center"><span class="metric-badge metric-good">Trigonométrica</span></td>
+        </tr>
+      </tbody>
+          </table>
+        </div>
+        
+        <div class="mt-4 text-xs text-gray-500">
+          <i class="fas fa-info-circle mr-1"></i> Los outliers se calcularon usando el método IQR (Q1 - 1.5*IQR, Q3 + 1.5*IQR).
+        </div>
+        <div class="mt-2 text-xs text-gray-500">
+          <i class="fas fa-info-circle mr-1"></i> Las variables <code>open_rate</code> y <code>click_rate</code> se originaron en la ingeniería de características.
+        </div>
+      </div>
+
+      <!-- Estrategias de Preprocesamiento -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-green-500 cluster-card">
+        <h3 class="text-xl font-bold text-green-800 mb-4">
+          <i class="fas fa-cogs text-green-600 mr-2"></i> Estrategias de Preprocesamiento Aplicadas
+        </h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 class="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+              <span class="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
+              Variables de conteo (send, delivered)
+            </h4>
+            <p class="text-sm text-gray-700 mb-4 leading-relaxed">
+              <strong>Transformación logarítmica (log1p)</strong> para reducir asimetría<br>
+              + <strong>RobustScaler</strong> para manejar outliers
+            </p>
+            
+            <h4 class="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+              <span class="w-3 h-3 bg-red-500 rounded-full mr-2"></span>
+              Variables con muchos ceros (&gt;70%)
+            </h4>
+            <p class="text-sm text-gray-700 mb-4 leading-relaxed">
+              bounce, open, click, open_rate, click_rate<br>
+              <strong>Solo RobustScaler</strong>
+            </p>
+          </div>
+          
+          <div>
+            <h4 class="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+              <span class="w-3 h-3 bg-purple-500 rounded-full mr-2"></span>
+              Variable binaria (buyer)
+            </h4>
+            <p class="text-sm text-gray-700 mb-4 leading-relaxed">
+              <strong>RobustScaler</strong> para suavizar su peso en el clustering
+            </p>
+            
+            <h4 class="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+              <span class="w-3 h-3 bg-teal-500 rounded-full mr-2"></span>
+              Variables temporales (hour, day_of_week)
+            </h4>
+            <p class="text-sm text-gray-700 leading-relaxed">
+              <strong>Transformación trigonométrica</strong> para capturar ciclicidad<br>
+              → sin_day, cos_day, sin_hour, cos_hour<br>
+              + <strong>RobustScaler</strong> para homogeneizar magnitudes
+            </p>
+          </div>
+        </div>
+
+        <!-- Nota técnica -->
+        <div class="mt-6 text-xs text-gray-500 text-center border-t pt-4 leading-relaxed">
+          <i class="fas fa-lightbulb mr-1"></i>
+          Nota técnica: Para variables con alta concentración de ceros, transformaciones como 
+          <strong>Box-Cox</strong> o <strong>Yeo-Johnson</strong> no resuelven el problema fundamental,
+          ya que la presencia masiva de ceros representa un patrón real del comportamiento de los usuarios,
+          no un error de medición.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Slide 3: Modelo de Clustering -->
+<section class="slide bg-white">
+  <div class="slide-content py-12 px-6">
+    <h2 class="text-3xl md:text-4xl font-bold text-center mb-8 text-gray-800 section-title">
+      Modelo de Clustering: K-means
+    </h2>
+    
+    <!-- Justificación -->
+    <div class="bg-blue-50 rounded-xl p-6 border border-blue-200 mb-10">
+      <h3 class="font-bold text-lg text-blue-800 mb-3 flex items-center">
+        <i class="fas fa-lightbulb mr-2"></i> ¿Por qué K-means?
+      </h3>
+      <ul class="text-gray-700 text-sm space-y-2">
+        <li>✔ Algoritmo eficiente y probado para segmentación de grandes volúmenes de clientes.</li>
+        <li>✔ Forma grupos buscando que los usuarios dentro de un cluster se parezcan entre sí y sean distintos de otros clusters.</li>
+        <li>✔ Fácil de interpretar y comunicar a equipos de negocio (marketing, RRHH).</li>
+      </ul>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+      <div class="bg-white rounded-xl p-4 border shadow-sm relative">
+        <h4 class="text-center text-sm font-semibold text-gray-700 mb-2">Método del Codo (Inercia vs K)</h4>
+        <canvas id="inertiaChart" class="w-full h-64"></canvas>
+        <div class="absolute bottom-2 right-2 text-xs text-gray-400">K=5 marcado</div>
+      </div>
+      <div class="bg-white rounded-xl p-4 border shadow-sm relative">
+        <h4 class="text-center text-sm font-semibold text-gray-700 mb-2">Coeficiente de Silhouette vs K</h4>
+        <canvas id="silhouetteChart" class="w-full h-64"></canvas>
+        <div class="absolute bottom-2 right-2 text-xs text-gray-400">K=5 marcado</div>
+      </div>
+    </div>
+
+    <!-- Definición de K -->
+    <div class="bg-green-50 rounded-xl p-6 border border-green-200 text-center">
+      <h3 class="font-bold text-lg text-green-800 mb-2">
+        <i class="fas fa-check-circle text-green-600 mr-2"></i> Definición del número de clusters
+      </h3>
+      <p class="text-gray-700 text-sm">
+        Aunque el coeficiente silhouette fue mayor en <strong>K=3</strong>, elegí 
+        <strong>K=5</strong> porque ofrece un mejor equilibrio: mantiene una separación aceptable entre grupos, 
+        pero permite mayor <strong>granularidad</strong> para diseñar estrategias de marketing y RRHH más personalizadas.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="slide bg-white">
+  <div class="slide-content py-12 px-6">
+    <h2 class="text-3xl md:text-4xl font-bold text-center mb-6 text-gray-800 section-title">
+      Metodología de Análisis de Clusters
+    </h2>
+    <p class="text-center text-gray-600 max-w-3xl mx-auto mb-12">
+      Una vez asignada la etiqueta de clúster a cada usuario, realicé un análisis multidimensional
+      para interpretar los segmentos desde perspectivas de negocio y marketing. El objetivo fue
+      caracterizar a cada grupo según <strong>tamaño, comportamiento de interacción, conversión y dinámica temporal</strong>.
+    </p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+      
+      <!-- Bloque 1 -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-blue-500 cluster-card">
+        <h3 class="text-xl font-bold text-blue-800 mb-4">
+          <i class="fas fa-users text-blue-600 mr-2"></i> Dimensiones Analizadas
+        </h3>
+        <ul class="text-gray-600 space-y-3 text-sm">
+          <li><span class="metric-badge metric-good mr-2">Tamaño</span> Cantidad de usuarios y proporción de compradores.</li>
+          <li><span class="metric-badge metric-good mr-2">Interacción</span> Tasas de entrega, apertura, clics y rebote (open rate, CTR, CTOR).</li>
+          <li><span class="metric-badge metric-good mr-2">Conversión</span> Compradores por interacción: desde clic, desde apertura o sin interacción.</li>
+          <li><span class="metric-badge metric-good mr-2">Engagement</span> Indicadores compuestos que combinan interacción y conversión.</li>
+        </ul>
+      </div>
+      
+      <!-- Bloque 2 -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-green-500 cluster-card">
+        <h3 class="text-xl font-bold text-green-800 mb-4">
+          <i class="fas fa-clock text-green-600 mr-2"></i> Dimensión Temporal
+        </h3>
+        <ul class="text-gray-600 space-y-3 text-sm">
+          <li>Reconstrucción de patrones de <strong>días y horas</strong> de mayor actividad.</li>
+          <li>Identificación de <strong>ventanas horarias óptimas</strong> mediante percentiles (IQR).</li>
+          <li>Diferenciación entre <strong>días laborables vs. fines de semana</strong>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Nota técnica -->
+    <div class="bg-blue-50 rounded-xl p-6 border border-blue-200">
+      <h4 class="font-bold text-lg text-blue-800 mb-3 flex items-center">
+        <i class="fas fa-lightbulb text-blue-600 mr-2"></i> ¿Por qué este enfoque?
+      </h4>
+      <p class="text-gray-700 text-sm">
+        Un análisis tradicional se limitaría a medir tasas globales o al pico de actividad (la moda).
+        En cambio, este enfoque permite <strong>detectar patrones de interacción más ricos y realistas</strong>:
+        no solo cuándo ocurre el máximo, sino también los intervalos de tiempo y las condiciones 
+        (día laboral vs. fin de semana) donde cada clúster tiene mayor probabilidad de interactuar.
+        Esto habilita <strong>estrategias de comunicación específicas y efectivas</strong> para cada segmento.
+      </p>
+    </div>
+  </div>
+</section>
+
+
+   <section class="slide bg-white">
+  <div class="slide-content py-12 px-6">
+    <h2 class="text-3xl md:text-4xl font-bold text-center mb-6 text-gray-800 section-title">
+      Los 5 Clusters
+    </h2>
+    <p class="text-center text-gray-600 max-w-3xl mx-auto mb-10">
+      Identificación de <strong>5 arquetipos de clientes</strong> con distintos niveles de interacción, 
+      conversión y entregabilidad.
+    </p>
+
+    <!-- Resumen Ejecutivo -->
+    <div class="bg-blue-50 rounded-xl p-6 border border-blue-200 mb-12">
+      <h3 class="text-lg font-bold text-blue-800 mb-3 flex items-center">
+        <i class="fas fa-lightbulb text-blue-600 mr-2"></i> Resumen Ejecutivo
+      </h3>
+      <ul class="text-sm text-gray-700 space-y-2">
+        <li><strong>Cluster 0 (29.374)</strong>: problema serio de entregabilidad (entrega ≈ 9,2%, rebotes ≈ 62,5%). Necesita limpieza inmediata.</li>
+        <li><strong>Clusters 1 (48.680) y 2 (121.938)</strong>: muchos compradores pero la mayoría no interactúa por email (86,6% y 75,7%). Compran por otros canales.</li>
+        <li><strong>Clusters 3 (5.598) y 4 (6.685)</strong>: segmentos premium para email, con alta entregabilidad y CTR. Ideales para campañas focalizadas.</li>
+        <li><strong>Prioridad:</strong> limpieza urgente de Cluster 0; estrategias cross-channel en 1–2; campañas VIP en 3–4.</li>
+      </ul>
+    </div>
+
+    <!-- Grid de Clusters -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+      <!-- Cluster 0 -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-red-500 cluster-card">
+        <div class="flex items-center mb-4">
+          <div class="bg-red-100 p-3 rounded-xl mr-4"><i class="fas fa-exclamation-triangle text-red-600 text-xl"></i></div>
+          <div>
+            <h3 class="text-xl font-bold text-red-800">Cluster 0: Alta falla / Entregabilidad baja</h3>
+            <p class="text-gray-500">29.374 usuarios</p>
+          </div>
+        </div>
+        <p class="text-gray-600 text-sm mb-4">Bounce crítico (≈62,5%) y entregabilidad ≈9%. Convierte cuando interactúa, pero requiere limpieza inmediata.</p>
+        <div class="text-xs space-y-2">
+          <div class="flex justify-between"><span>Entregabilidad:</span><span class="metric-badge metric-bad">9.2%</span></div>
+          <div class="flex justify-between"><span>Open rate:</span><span class="font-bold">66.6%</span></div>
+          <div class="flex justify-between"><span>CTR:</span><span class="font-bold">10.0%</span></div>
+          <div class="flex justify-between"><span>% Compradores:</span><span class="font-bold">12.0%</span></div>
+          <div class="flex justify-between"><span>Día preferido:</span><span class="font-bold">Martes</span></div>
+          <div class="flex justify-between"><span>Ventana:</span><span class="font-bold">09:00 - 24:00</span></div>
+        </div>
+      </div>
+
+      <!-- Cluster 1 -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-amber-500 cluster-card">
+        <div class="flex items-center mb-4">
+          <div class="bg-amber-100 p-3 rounded-xl mr-4"><i class="fas fa-store text-amber-600 text-xl"></i></div>
+          <div>
+            <h3 class="text-xl font-bold text-amber-800">Cluster 1: Compradores silenciosos</h3>
+            <p class="text-gray-500">48.680 usuarios</p>
+          </div>
+        </div>
+        <p class="text-gray-600 text-sm mb-4">Compran (≈69%) pero casi no usan email (87% sin interacción). Probable origen en otros canales.</p>
+        <div class="text-xs space-y-2">
+          <div class="flex justify-between"><span>Entregabilidad:</span><span class="metric-badge metric-warning">81.7%</span></div>
+          <div class="flex justify-between"><span>Open rate:</span><span class="font-bold">13.9%</span></div>
+          <div class="flex justify-between"><span>CTR:</span><span class="font-bold">2.1%</span></div>
+          <div class="flex justify-between"><span>% Compradores:</span><span class="font-bold">68.9%</span></div>
+          <div class="flex justify-between"><span>Día preferido:</span><span class="font-bold">Viernes</span></div>
+          <div class="flex justify-between"><span>Ventana:</span><span class="font-bold">19:30 - 21:30</span></div>
+        </div>
+      </div>
+
+      <!-- Cluster 2 -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-yellow-500 cluster-card">
+        <div class="flex items-center mb-4">
+          <div class="bg-yellow-100 p-3 rounded-xl mr-4"><i class="fas fa-layer-group text-yellow-600 text-xl"></i></div>
+          <div>
+            <h3 class="text-xl font-bold text-yellow-800">Cluster 2: Gran masa poco atenta</h3>
+            <p class="text-gray-500">121.938 usuarios</p>
+          </div>
+        </div>
+        <p class="text-gray-600 text-sm mb-4">El cluster más grande, entregabilidad casi perfecta (97%). Bajo engagement, pero convierten al interactuar.</p>
+        <div class="text-xs space-y-2">
+          <div class="flex justify-between"><span>Entregabilidad:</span><span class="metric-badge metric-good">97.4%</span></div>
+          <div class="flex justify-between"><span>Open rate:</span><span class="font-bold">22.8%</span></div>
+          <div class="flex justify-between"><span>CTR:</span><span class="font-bold">3.1%</span></div>
+          <div class="flex justify-between"><span>% Compradores:</span><span class="font-bold">70.2%</span></div>
+          <div class="flex justify-between"><span>Día preferido:</span><span class="font-bold">Martes</span></div>
+          <div class="flex justify-between"><span>Ventana:</span><span class="font-bold">17:00 - 21:00</span></div>
+        </div>
+      </div>
+
+      <!-- Cluster 3 -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-green-500 cluster-card">
+        <div class="flex items-center mb-4">
+          <div class="bg-green-100 p-3 rounded-xl mr-4"><i class="fas fa-sun text-green-600 text-xl"></i></div>
+          <div>
+            <h3 class="text-xl font-bold text-green-800">Cluster 3: Engagers matutinos</h3>
+            <p class="text-gray-500">5.598 usuarios</p>
+          </div>
+        </div>
+        <p class="text-gray-600 text-sm mb-4">Alta interacción y conversión por email. Responden mejor a campañas matutinas.</p>
+        <div class="text-xs space-y-2">
+          <div class="flex justify-between"><span>Entregabilidad:</span><span class="metric-badge metric-good">90.1%</span></div>
+          <div class="flex justify-between"><span>Open rate:</span><span class="font-bold">92.3%</span></div>
+          <div class="flex justify-between"><span>CTR:</span><span class="font-bold">18.2%</span></div>
+          <div class="flex justify-between"><span>% Compradores:</span><span class="font-bold">65.6%</span></div>
+          <div class="flex justify-between"><span>Día preferido:</span><span class="font-bold">Jueves</span></div>
+          <div class="flex justify-between"><span>Ventana:</span><span class="font-bold">07:30 - 13:30</span></div>
+        </div>
+      </div>
+
+      <!-- Cluster 4 -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-purple-500 cluster-card">
+        <div class="flex items-center mb-4">
+          <div class="bg-purple-100 p-3 rounded-xl mr-4"><i class="fas fa-gem text-purple-600 text-xl"></i></div>
+          <div>
+            <h3 class="text-xl font-bold text-purple-800">Cluster 4: Elite hiper-engaged</h3>
+            <p class="text-gray-500">6.685 usuarios</p>
+          </div>
+        </div>
+        <p class="text-gray-600 text-sm mb-4">El segmento VIP: 100% entregabilidad, open y click rates altísimos. Perfecto para campañas premium.</p>
+        <div class="text-xs space-y-2">
+          <div class="flex justify-between"><span>Entregabilidad:</span><span class="metric-badge metric-good">100%</span></div>
+          <div class="flex justify-between"><span>Open rate:</span><span class="font-bold">≈100%</span></div>
+          <div class="flex justify-between"><span>CTR:</span><span class="font-bold">32.0%</span></div>
+          <div class="flex justify-between"><span>% Compradores:</span><span class="font-bold">68.7%</span></div>
+          <div class="flex justify-between"><span>Día preferido:</span><span class="font-bold">Miércoles</span></div>
+          <div class="flex justify-between"><span>Ventana:</span><span class="font-bold">14:00 - 17:00</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+<section class="slide bg-white">
+  <div class="slide-content py-12 px-6">
+    <h2 class="text-3xl md:text-4xl font-bold text-center mb-6 text-gray-800 section-title">
+      Plan de Acción por Cluster
+    </h2>
+    <p class="text-center text-gray-600 max-w-3xl mx-auto mb-12">
+      Acciones recomendadas para cada segmento, priorizadas según su impacto en la entregabilidad, 
+      conversión y valor estratégico.
+    </p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+      <!-- Cluster 0 -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-red-500 cluster-card">
+        <div class="flex items-center mb-4">
+          <div class="bg-red-100 p-3 rounded-xl mr-4">
+            <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+          </div>
+          <h3 class="text-lg font-bold text-red-800">Cluster 0 — Limpieza inmediata</h3>
+        </div>
+        <ul class="text-sm text-gray-700 space-y-2">
+          <li>✔ Validar correos (herramienta externa) y suprimir rebotes.</li>
+          <li>✔ Ejecutar campaña de re-confirmación.</li>
+          <li>✔ Pausar envíos masivos hasta limpiar lista.</li>
+          <li>🎯 Objetivo: reducir rebotes &gt;60% a &lt;5%.</li>
+        </ul>
+      </div>
+
+      <!-- Cluster 1 -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-amber-500 cluster-card">
+        <div class="flex items-center mb-4">
+          <div class="bg-amber-100 p-3 rounded-xl mr-4">
+            <i class="fas fa-store text-amber-600 text-xl"></i>
+          </div>
+          <h3 class="text-lg font-bold text-amber-800">Cluster 1 — Compradores silenciosos</h3>
+        </div>
+        <ul class="text-sm text-gray-700 space-y-2">
+          <li>✔ Integrar ventas offline/marketplace en CRM.</li>
+          <li>✔ Reducir frecuencia de envíos masivos.</li>
+          <li>✔ Detectar subgrupo activo (top openers/clickers).</li>
+          <li>🎯 Objetivo: atribución correcta y ahorro en envíos.</li>
+        </ul>
+      </div>
+
+      <!-- Cluster 2 -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-yellow-500 cluster-card">
+        <div class="flex items-center mb-4">
+          <div class="bg-yellow-100 p-3 rounded-xl mr-4">
+            <i class="fas fa-layer-group text-yellow-600 text-xl"></i>
+          </div>
+          <h3 class="text-lg font-bold text-yellow-800">Cluster 2 — Gran volumen</h3>
+        </div>
+        <ul class="text-sm text-gray-700 space-y-2">
+          <li>✔ Mantener envíos periódicos (alta entregabilidad).</li>
+          <li>✔ Subsegmentar por engagement: clickeadores, openers, inactivos.</li>
+          <li>✔ Incentivar inactivos con cross-channel (SMS, redes).</li>
+          <li>🎯 Objetivo: optimizar ROI por envío.</li>
+        </ul>
+      </div>
+
+      <!-- Cluster 3 -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-green-500 cluster-card">
+        <div class="flex items-center mb-4">
+          <div class="bg-green-100 p-3 rounded-xl mr-4">
+            <i class="fas fa-sun text-green-600 text-xl"></i>
+          </div>
+          <h3 class="text-lg font-bold text-green-800">Cluster 3 — Engagers matutinos</h3>
+        </div>
+        <ul class="text-sm text-gray-700 space-y-2">
+          <li>✔ Programar envíos en la mañana (07:30–13:30).</li>
+          <li>✔ Contenido premium, lanzamientos y upsells.</li>
+          <li>✔ Medir LTV y fidelizar con programas VIP.</li>
+          <li>🎯 Objetivo: maximizar ROI de email.</li>
+        </ul>
+      </div>
+
+      <!-- Cluster 4 -->
+      <div class="bg-white rounded-xl p-6 border-t-4 border-purple-500 cluster-card">
+        <div class="flex items-center mb-4">
+          <div class="bg-purple-100 p-3 rounded-xl mr-4">
+            <i class="fas fa-gem text-purple-600 text-xl"></i>
+          </div>
+          <h3 class="text-lg font-bold text-purple-800">Cluster 4 — Elite hiper-engaged</h3>
+        </div>
+        <ul class="text-sm text-gray-700 space-y-2">
+          <li>✔ Tratar como VIP: early-access, bundles, cross-sell.</li>
+          <li>✔ Personalizar al máximo (test creativos y pricing).</li>
+          <li>✔ Medir ingresos y coste por envío.</li>
+          <li>🎯 Objetivo: retención y aumento del ticket medio.</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+ <section class="slide bg-white">
+  <div class="slide-content py-12 px-6">
+    <h2 class="text-3xl md:text-4xl font-bold text-center mb-6 text-gray-800 section-title">
+      Performance General de la Campaña
+    </h2>
+    <p class="text-center text-gray-600 max-w-2xl mx-auto mb-12">
+      Resumen integral de resultados globales y métricas de los clusters identificados.
+    </p>
+
+    <!-- Resumen de Campaña -->
+    <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-8">
+      <h3 class="text-xl font-bold text-gray-800 mb-4">Resumen de Campaña</h3>
+      <ul class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-center text-gray-700">
+        <li class="p-4 bg-gray-50 rounded-lg shadow-sm">
+          <p class="text-sm">Total Envíos</p>
+          <p class="text-2xl font-bold text-blue-600">797,751</p>
+        </li>
+        <li class="p-4 bg-gray-50 rounded-lg shadow-sm">
+          <p class="text-sm">Rebotes</p>
+          <p class="text-2xl font-bold text-red-500">56,103 <span class="text-xs">(7.0%)</span></p>
+        </li>
+        <li class="p-4 bg-gray-50 rounded-lg shadow-sm">
+          <p class="text-sm">Aperturas</p>
+          <p class="text-2xl font-bold text-yellow-500">102,711 <span class="text-xs">(12.9%)</span></p>
+        </li>
+        <li class="p-4 bg-gray-50 rounded-lg shadow-sm">
+          <p class="text-sm">Clics</p>
+          <p class="text-2xl font-bold text-green-600">15,308 <span class="text-xs">(1.9%)</span></p>
+        </li>
+      </ul>
+      <div class="mt-6">
+        <canvas id="campaignBarChart" height="120"></canvas>
+      </div>
+    </div>
+
+    <!-- Interacciones por Día de la Semana -->
+    <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-8">
+      <h3 class="text-xl font-bold text-gray-800 mb-2">Interacciones por Día de la Semana</h3>
+      <p class="text-sm text-gray-500 mb-4">Distribución de envíos, rebotes, aperturas, clics y compras según el día.</p>
+      <canvas id="dayOfWeekChart" height="180"></canvas>
+    </div>
+
+    <!-- Métricas de Clusters -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Tamaño de Clusters</h3>
+        <p class="text-sm text-gray-500 mb-4">Proporción de usuarios en cada cluster de segmentación.</p>
+        <canvas id="clusterSizeChart" height="250"></canvas>
+      </div>
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Tasas de Conversión por Click</h3>
+        <p class="text-sm text-gray-500 mb-4">Mide qué porcentaje de clics resultó en una compra.</p>
+        <canvas id="conversionChart" height="250"></canvas>
+      </div>
+    </div>
+
+    <!-- Engagement -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Tasas de Apertura y Clics (CTR)</h3>
+        <p class="text-sm text-gray-500 mb-4">Porcentaje de emails entregados que generaron apertura o clic.</p>
+        <canvas id="openRateChart" height="250"></canvas>
+      </div>
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <h3 class="text-xl font-bold text-gray-800 mb-2">Click-to-Open Rate (CTOR)</h3>
+        <p class="text-sm text-gray-500 mb-4">Proporción de clics sobre los emails que fueron abiertos.</p>
+        <canvas id="ctorChart" height="250"></canvas>
+      </div>
+    </div>
+
+    <div class="bg-blue-50 rounded-xl p-6 border border-blue-200">
+      <h4 class="font-bold text-lg text-blue-800 mb-3 flex items-center">
+        <i class="fas fa-lightbulb text-blue-600 mr-2"></i> Insights Clave
+      </h4>
+      <p class="text-gray-700">
+        La campaña alcanzó <strong>casi 800 mil envíos</strong> con tasas de apertura del <strong>12,9%</strong> y clics del <strong>1,9%</strong>.
+        Los <strong>miércoles y jueves</strong> concentran la mayor interacción. Los clusters <strong>3 y 4</strong> muestran un engagement sobresaliente
+        y alto ROI por email, mientras que el <strong>Cluster 0</strong> presenta problemas serios de entregabilidad que requieren limpieza inmediata.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="slide bg-gradient-to-br from-blue-50 to-purple-50">
+  <div class="slide-content flex flex-col items-center justify-center text-center py-20">
+    
+    <h2 class="text-4xl md:text-5xl font-bold text-gray-800 mb-6">
+      ¡Gracias!
+    </h2>
+    
+    <p class="text-lg text-gray-600 mb-2">
+      <span class="font-bold">Mel Zárate</span>
+    </p>
+    <p class="text-sm text-gray-500 mb-8">
+      Business & Data Strategy | UX-Driven Innovation | Cultural Branding | Python & Machine Learning
+    </p>
+
+    <div class="space-y-3 text-gray-700">
+      <p>
+        <i class="fas fa-envelope text-blue-600 mr-2"></i>
+        <a href="mailto:zaratemustienesmel@gmail.com" class="text-blue-700 hover:underline">
+          zaratemustienesmel@gmail.com
+        </a>
+      </p>
+      <p>
+        <i class="fab fa-linkedin text-blue-600 mr-2"></i>
+        <a href="https://www.linkedin.com/in/melzarate" target="_blank" class="text-blue-700 hover:underline">
+          linkedin.com/in/melzarate
+        </a>
+      </p>
+    </div>
+  </div>
+</section>
+
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const slides = document.querySelectorAll('.slide');
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const nextSlideBtns = document.querySelectorAll('.next-slide-btn');
+            const restartBtn = document.getElementById('restart-btn');
+            const progressBar = document.getElementById('progress-bar');
+            let currentSlide = 0;
+
+            // generar dots dinámicamente (según la cantidad real de slides)
+            const dots = Array.from({ length: slides.length }, (_, i) => {
+                const d = document.createElement('div');
+                d.className = 'progress-dot' + (i === 0 ? ' active' : '');
+                d.setAttribute('data-slide', i);
+                d.style.cursor = 'pointer';
+                d.addEventListener('click', () => goToSlide(i));
+                if (progressBar) progressBar.appendChild(d);
+                return d;
+            });
+
+            function showSlide(index) {
+                slides.forEach((slide, i) => {
+                    slide.classList.toggle('active', i === index);
+                });
+                dots.forEach((dot, i) => {
+                    dot.classList.toggle('active', i === index);
+                });
+            }
+
+            function goToSlide(n) {
+                currentSlide = (n + slides.length) % slides.length;
+                showSlide(currentSlide);
+            }
+
+            // Event listeners
+            prevBtn.addEventListener('click', () => goToSlide(currentSlide - 1));
+            nextBtn.addEventListener('click', () => goToSlide(currentSlide + 1));
+            
+            nextSlideBtns.forEach(btn => {
+                btn.addEventListener('click', () => goToSlide(currentSlide + 1));
+            });
+            
+            if (restartBtn) {
+                restartBtn.addEventListener('click', () => goToSlide(0));
+            }
+            
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') {
+                    goToSlide(currentSlide - 1);
+                } else if (e.key === 'ArrowRight') {
+                    goToSlide(currentSlide + 1);
+                } else if (e.key === 'Home') {
+                    goToSlide(0);
+                } else if (e.key === 'End') {
+                    goToSlide(slides.length - 1);
+                }
+            });
+// Inercia vs K
+new Chart(document.getElementById('inertiaChart'), {
+  type: 'line',
+  data: {
+    labels: [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19],
+    datasets: [{
+      label: 'Inercia',
+      data: [1641258.8875,1326176.4088,1045141.2682,988531.8649,
+             882013.0646,782226.7537,756721.3317,720298.2990,
+             671141.2244,656562.4603,623655.9238,607088.8744,
+             555448.8692,536029.0811,525540.6126,507701.8192,
+             466709.6242,432629.1480],
+      borderColor: '#4F46E5',
+      backgroundColor: 'rgba(79,70,229,0.2)',
+      fill: true,
+      tension: 0.2
+    },{
+      // Línea vertical para K=5
+      label: 'K=5',
+      data: [null,null,null,988531.8649,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+      borderColor: 'red',
+      borderWidth: 2,
+      pointRadius: 5,
+      pointBackgroundColor: 'red',
+      showLine: false
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { title: { display: true, text: 'K' } },
+      y: { title: { display: true, text: 'Inercia' } }
+    }
+  }
+});
+
+// Silhouette vs K
+new Chart(document.getElementById('silhouetteChart'), {
+  type: 'line',
+  data: {
+    labels: [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19],
+    datasets: [{
+      label: 'Silhouette',
+      data: [0.3223,0.3820,0.4098,0.4032,0.3918,0.3257,0.2869,
+             0.3059,0.3074,0.3105,0.3176,0.3146,0.3150,0.3245,
+             0.3089,0.3093,0.3256,0.3484],
+      borderColor: '#059669',
+      backgroundColor: 'rgba(16,185,129,0.2)',
+      fill: true,
+      tension: 0.2
+    },{
+      // Punto marcado en K=5
+      label: 'K=5',
+      data: [null,null,null,0.4032,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+      borderColor: 'red',
+      borderWidth: 2,
+      pointRadius: 5,
+      pointBackgroundColor: 'red',
+      showLine: false
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { title: { display: true, text: 'K' } },
+      y: { title: { display: true, text: 'Coef. Silhouette' }, min: 0, max: 1 }
+    }
+  }
+});
+
+            // Chart Data
+            const clusterSizeData = {
+                labels: ['Estratégico', 'En Riesgo', 'Oportunidad', 'Alto Riesgo', 'VIP'],
+                datasets: [{
+                    label: 'Tamaño del Cluster',
+                    data: [56426, 49140, 69572, 30529, 46608],
+                    backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#ef4444', '#8b5cf6'],
+                    borderWidth: 0
+                }]
+            };
+
+            const conversionData = {
+                labels: ['Estratégico', 'En Riesgo', 'Oportunidad', 'Alto Riesgo', 'VIP'],
+                datasets: [{
+                    label: '% de Compradores',
+                    data: [62.3, 68.7, 74.2, 19.0, 68.8],
+                    backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#ef4444', '#8b5cf6'],
+                    borderWidth: 0
+                }]
+            };
+
+            const openRateData = {
+                labels: ['Estratégico', 'En Riesgo', 'Oportunidad', 'Alto Riesgo', 'VIP'],
+                datasets: [{
+                    label: 'Tasa de Apertura (%)',
+                    data: [29.6, 14.5, 17.9, 83.3, 32.8],
+                    backgroundColor: 'rgba(79, 70, 229, 0.7)',
+                    borderColor: 'rgba(79, 70, 229, 1)',
+                    borderWidth: 1,
+                    type: 'bar',
+                    yAxisID: 'y'
+                }, {
+                    label: 'Tasa de Clics (CTR) (%)',
+                    data: [4.7, 2.1, 2.0, 14.8, 2.0],
+                    backgroundColor: 'rgba(124, 58, 237, 0.7)',
+                    borderColor: 'rgba(124, 58, 237, 1)',
+                    borderWidth: 1,
+                    type: 'bar',
+                    yAxisID: 'y'
+                }]
+            };
+
+            const conversionInteractionData = {
+                labels: ['Estratégico', 'En Riesgo', 'Oportunidad', 'Alto Riesgo', 'VIP'],
+                datasets: [{
+                    label: 'Conversión por Clic (%)',
+                    data: [73.4, 80.1, 83.2, 76.0, 67.4],
+                    backgroundColor: 'rgba(251, 191, 36, 0.7)',
+                    borderColor: 'rgba(251, 191, 36, 1)',
+                    borderWidth: 1,
+                    type: 'bar',
+                    yAxisID: 'y'
+                }, {
+                    label: 'Conversión por Apertura (%)',
+                    data: [72.5, 80.8, 82.9, 76.2, 68.8],
+                    backgroundColor: 'rgba(20, 184, 166, 0.7)',
+                    borderColor: 'rgba(20, 184, 166, 1)',
+                    borderWidth: 1,
+                    type: 'bar',
+                    yAxisID: 'y'
+                }]
+            };
+
+            // Initialize Charts
+            const clusterSizeChart = new Chart(document.getElementById('clusterSizeChart'), {
+                type: 'bar',
+                data: clusterSizeData,
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Número de Usuarios'
+                            }
+                        }
+                    }
+                }
+            });
+
+            const conversionChart = new Chart(document.getElementById('conversionChart'), {
+                type: 'bar',
+                data: conversionData,
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            const openRateChart = new Chart(document.getElementById('openRateChart'), {
+                type: 'bar',
+                data: openRateData,
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Tasa (%)'
+                            },
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            const conversionInteractionChart = new Chart(document.getElementById('conversionInteractionChart'), {
+                type: 'bar',
+                data: conversionInteractionData,
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Tasa (%)'
+                            },
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Initialize
+            showSlide(currentSlide);
+        });
+ // === Interacciones respecto al total de envíos ===
+  const ctxCampaign = document.getElementById('campaignBarChart').getContext('2d');
+  new Chart(ctxCampaign, {
+    type: 'bar',
+    data: {
+      labels: ['Rebotes', 'Aperturas', 'Clics'],
+      datasets: [{
+        label: 'Porcentaje sobre envíos',
+        data: [7.03, 12.88, 1.92],
+        backgroundColor: ['#FF6B6B', '#FFD166', '#45B7D1'],
+        borderRadius: 8
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const values = [56103, 102711, 15308];
+              return `${ctx.formattedValue}% (${values[ctx.dataIndex].toLocaleString()} mails)`;
+            }
+          }
+        },
+        title: {
+          display: true,
+          text: 'Interacciones respecto al Total de Envíos'
+        }
+      },
+      scales: {
+        y: { beginAtZero: true, max: 20, ticks: { callback: v => v + "%" } }
+      }
+    }
+  });
+
+  // === Interacciones por Día de la Semana ===
+  const ctxDay = document.getElementById('dayOfWeekChart').getContext('2d');
+  new Chart(ctxDay, {
+    type: 'bar',
+    data: {
+      labels: ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'],
+      datasets: [
+        { label: 'Enviados', data: [7502,133573,352724,176328,112281,14917,426], backgroundColor: '#A0AEC0' },
+        { label: 'Rebotes', data: [1273,16412,18697,8488,10284,723,226], backgroundColor: '#FF6B6B' },
+        { label: 'Aperturas', data: [617,10040,42616,30474,16661,2183,120], backgroundColor: '#FFD166' },
+        { label: 'Clics', data: [256,1799,5602,4525,2550,502,74], backgroundColor: '#45B7D1' },
+        { label: 'Compradores', data: [5189,21222,44050,25975,28757,5630,64], backgroundColor: '#06D6A0' }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: { display: true, text: 'Interacciones por Día de la Semana' },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: { x: { stacked: false }, y: { beginAtZero: true } }
+    }
+  });
+
+  // === Tamaño de clusters ===
+  const ctxClusterSize = document.getElementById('clusterSizeChart').getContext('2d');
+  new Chart(ctxClusterSize, {
+    type: 'pie',
+    data: {
+      labels: ['Cluster 0','Cluster 1','Cluster 2','Cluster 3','Cluster 4'],
+      datasets: [{
+        data: [29374,48680,121938,5598,6685],
+        backgroundColor: ['#EF4444','#F59E0B','#3B82F6','#10B981','#8B5CF6']
+      }]
+    },
+    options: {
+      plugins: {
+        title: { display: true, text: 'Distribución de Usuarios por Cluster' }
+      }
+    }
+  });
+
+  // === Tasas de conversión por click ===
+  const ctxConv = document.getElementById('conversionChart').getContext('2d');
+  new Chart(ctxConv, {
+    type: 'bar',
+    data: {
+      labels: ['Cluster 0','Cluster 1','Cluster 2','Cluster 3','Cluster 4'],
+      datasets: [{
+        label: 'Conversión por Click (%)',
+        data: [66.4,80.9,76.9,78.0,66.9],
+        backgroundColor: '#06D6A0',
+        borderRadius: 8
+      }]
+    },
+    options: {
+      plugins: {
+        title: { display: true, text: 'Tasa de Conversión por Click' },
+        legend: { display: false }
+      },
+      scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + "%" } } }
+    }
+  });
+
+  // === Tasas de apertura y clics (CTR) ===
+  const ctxOpen = document.getElementById('openRateChart').getContext('2d');
+  new Chart(ctxOpen, {
+    type: 'bar',
+    data: {
+      labels: ['Cluster 0','Cluster 1','Cluster 2','Cluster 3','Cluster 4'],
+      datasets: [
+        { label: 'Open Rate (%)', data: [66.6,13.9,22.8,92.3,100], backgroundColor: '#FFD166' },
+        { label: 'CTR (%)', data: [10.0,2.1,3.1,18.2,32.0], backgroundColor: '#45B7D1' }
+      ]
+    },
+    options: {
+      plugins: { title: { display: true, text: 'Tasas de Apertura y CTR por Cluster' } },
+      responsive: true,
+      scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + "%" } } }
+    }
+  });
+
+  // === Click-to-Open Rate (CTOR) ===
+  const ctxCTOR = document.getElementById('ctorChart').getContext('2d');
+  new Chart(ctxCTOR, {
+    type: 'bar',
+    data: {
+      labels: ['Cluster 0','Cluster 1','Cluster 2','Cluster 3','Cluster 4'],
+      datasets: [{
+        label: 'CTOR (%)',
+        data: [14.9,15.2,13.7,19.8,32.0],
+        backgroundColor: '#8B5CF6',
+        borderRadius: 8
+      }]
+    },
+    options: {
+      plugins: {
+        title: { display: true, text: 'Click-to-Open Rate (CTOR) por Cluster' },
+        legend: { display: false }
+      },
+      scales: { y: { beginAtZero: true, max: 40, ticks: { callback: v => v + "%" } } }
+    }
+  });
+    </script>
+</body>
+</html>
